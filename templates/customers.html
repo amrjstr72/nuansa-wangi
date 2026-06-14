@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-users"></i> Data Pelanggan</h1>
+        <p class="text-muted mb-0">{{ total_filtered }} pelanggan ditemukan</p>
+    </div>
+    {% if has_permission('create_customer') %}
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
+        <i class="fas fa-plus me-1"></i> Tambah Customer
+    </button>
+    {% endif %}
+</div>
+
+<!-- Filter Bar -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0"
+                           placeholder="Cari nama pelanggan..." value="{{ search }}">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select name="segment" class="form-select">
+                    <option value="">Semua Kelompok</option>
+                    {% for seg in segments %}
+                    <option value="{{ seg }}" {% if segment == seg %}selected{% endif %}>{{ seg }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Cari</button>
+            </div>
+            <div class="col-md-1">
+                <a href="{{ url_for('customers') }}" class="btn btn-outline-secondary w-100"
+                   title="Reset pencarian">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nama Pelanggan</th>
+                        <th>Nomor HP</th>
+                        <th>Lokasi</th>
+                        <th>Kategori</th>
+                        <th>Terakhir Beli</th>
+                        <th>Jumlah Transaksi</th>
+                        <th>Total Belanja</th>
+                        <th>Kelompok</th>
+                        {% if has_permission('edit_customer') or has_permission('delete_customer') %}
+                        <th class="text-end">Aksi</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c, r, s in rows %}
+                    <tr>
+                        <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                        <td>
+                            {% if c.nomor_hp %}
+                            {% if has_permission('contact_customer') %}
+                            {% set wa_link = whatsapp_url(c.nomor_hp, s.segment_label, c.nama_pelanggan) %}
+                            {% if wa_link %}
+                            <a href="{{ wa_link }}"
+                               target="_blank" class="text-success" title="Hubungi via WhatsApp">
+                                <i class="fab fa-whatsapp me-1"></i>{{ c.nomor_hp }}
+                            </a>
+                            {% else %}
+                            {{ c.nomor_hp }}
+                            {% endif %}
+                            {% else %}
+                            {{ c.nomor_hp }}
+                            {% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-truncate" style="max-width:180px" title="{{ c.lokasi }}">
+                            {{ c.lokasi or '-' }}
+                        </td>
+                        <td>{{ c.kategori or '-' }}</td>
+                        <td>
+                            {% if r.last_transaction_date %}
+                                {{ r.last_transaction_date.strftime('%d %b %Y') }}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ r.frequency }}x</td>
+                        <td>Rp {{ "{:,.0f}".format(r.monetary) }}</td>
+                        <td>
+                            <span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">
+                                <i class="fas {{ segment_config[s.segment_label]['icon'] }} me-1"></i>
+                                {{ s.segment_label }}
+                            </span>
+                        </td>
+                        {% if has_permission('edit_customer') or has_permission('delete_customer') %}
+                        <td class="text-end">
+                            {% if has_permission('edit_customer') %}
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
+                                    data-bs-target="#editCustomerModal{{ c.id }}" title="Edit customer">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                            {% endif %}
+                            {% if has_permission('delete_customer') %}
+                            <form method="POST" action="{{ url_for('delete_customer', cid=c.id) }}" class="d-inline"
+                                  onsubmit="return confirm('Hapus customer ini?')">
+                                <button class="btn btn-sm btn-outline-danger" title="Hapus customer">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="{% if has_permission('edit_customer') or has_permission('delete_customer') %}9{% else %}8{% endif %}" class="text-center py-5 text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                        Tidak ada pelanggan yang cocok dengan pencarian.
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+        {% if page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page-1 }}&search={{ search }}&segment={{ segment }}">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+
+        {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="?page={{ p }}&search={{ search }}&segment={{ segment }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page+1 }}&search={{ search }}&segment={{ segment }}">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+    <p class="text-center text-muted small">
+        Halaman {{ page }} dari {{ total_pages }} ({{ total_filtered }} pelanggan)
+    </p>
+</nav>
+{% endif %}
+
+{% if has_permission('edit_customer') %}
+{% for c, r, s in rows %}
+<div class="modal fade" id="editCustomerModal{{ c.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('edit_customer', cid=c.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Customer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {% set customer=c %}{% set rfm=r %}{% set seg=s %}
+                    {% include "_customer_form.html" %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if has_permission('create_customer') %}
+<div class="modal fade" id="addCustomerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('add_customer') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Tambah Customer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {% set customer=None %}{% set rfm=None %}{% set seg=None %}
+                    {% include "_customer_form.html" %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-primary">Tambah</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

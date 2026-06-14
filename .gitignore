@@ -1,0 +1,30 @@
+# Environment & secrets — JANGAN di-commit
+.env
+*.db
+*.sqlite3
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Model files
+model/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Instance folder (berisi database lokal)
+instance/

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-layer-group"></i> Kelompok Pelanggan</h1>
+        <p class="text-muted mb-0">
+            Pelanggan dikelompokkan otomatis menggunakan metode K-Means menjadi 4 kelompok
+            berdasarkan kebiasaan belanja mereka
+        </p>
+    </div>
+</div>
+
+<!-- Kartu Ringkasan per Kelompok -->
+<div class="row g-3 mb-4">
+    {% for label, cfg in segment_config.items() %}
+    <div class="col-md-3">
+        <a href="?segment={{ label }}" class="text-decoration-none">
+            <div class="segment-card {% if segment == label %}segment-active{% endif %}"
+                 style="border-top: 4px solid {{ cfg.color }}">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="segment-icon" style="background: {{ cfg.color }}20; color: {{ cfg.color }}">
+                        <i class="fas {{ cfg.icon }}"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0">{{ seg_counts.get(label, 0) }}</h4>
+                        <small class="text-muted">{{ label }}</small>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="progress" style="height:6px">
+                        <div class="progress-bar"
+                             style="width:{{ (seg_counts.get(label,0) / (seg_counts.values()|sum) * 100)|round(1) }}%;
+                                    background:{{ cfg.color }}">
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        {{ ((seg_counts.get(label,0) / (seg_counts.values()|sum)) * 100)|round(1) }}%
+                        dari total pelanggan
+                    </small>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Penjelasan per Kelompok -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="desc-card" style="border-left:4px solid #f59e0b">
+            <strong><i class="fas fa-crown text-warning me-1"></i> Pelanggan Terbaik</strong>
+            <p class="small text-muted mt-1 mb-0">
+                Paling sering beli, pengeluaran paling besar, dan beli paling baru-baru ini.
+                Berikan apresiasi khusus agar tetap loyal.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="desc-card" style="border-left:4px solid #10b981">
+            <strong><i class="fas fa-heart text-success me-1"></i> Pelanggan Setia</strong>
+            <p class="small text-muted mt-1 mb-0">
+                Rutin beli dan konsisten. Pertahankan dengan program loyalitas
+                dan penawaran yang lebih personal.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="desc-card" style="border-left:4px solid #3b82f6">
+            <strong><i class="fas fa-seedling text-primary me-1"></i> Pelanggan Potensial</strong>
+            <p class="small text-muted mt-1 mb-0">
+                Sudah pernah beli tapi belum terlalu sering. Dorong agar mau beli lagi
+                dengan promosi dan follow-up.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="desc-card" style="border-left:4px solid #ef4444">
+            <strong><i class="fas fa-exclamation text-danger me-1"></i> Perlu Perhatian</strong>
+            <p class="small text-muted mt-1 mb-0">
+                Sudah lama tidak beli. Segera hubungi dan tawarkan sesuatu
+                yang menarik agar kembali berbelanja.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0"
+                           placeholder="Cari nama pelanggan..." value="{{ search }}">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select name="segment" class="form-select">
+                    <option value="">Tampilkan Semua Kelompok</option>
+                    {% for seg in segments %}
+                    <option value="{{ seg }}" {% if segment == seg %}selected{% endif %}>{{ seg }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Tampilkan</button>
+            </div>
+            <div class="col-auto">
+                <a href="{{ url_for('segmentation') }}" class="btn btn-outline-secondary"
+                   title="Tampilkan semua">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nama Pelanggan</th>
+                        <th>Kategori</th>
+                        <th>Lokasi</th>
+                        <th>Terakhir Beli</th>
+                        <th>Jumlah Transaksi</th>
+                        <th>Total Belanja</th>
+                        <th>No. Kelompok</th>
+                        <th>Kelompok</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c, r, s in rows %}
+                    <tr>
+                        <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                        <td>{{ c.kategori or '-' }}</td>
+                        <td class="text-truncate" style="max-width:140px" title="{{ c.lokasi }}">
+                            {{ c.lokasi or '-' }}
+                        </td>
+                        <td>{{ r.display_recency }} hari lalu</td>
+                        <td>{{ r.frequency }}x</td>
+                        <td>Rp {{ "{:,.0f}".format(r.monetary) }}</td>
+                        <td>
+                            <span class="badge bg-secondary" title="Nomor kelompok dari hasil K-Means">
+                                Cluster {{ s.cluster }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">
+                                <i class="fas {{ segment_config[s.segment_label]['icon'] }} me-1"></i>
+                                {{ s.segment_label }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="text-center py-5 text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                        Tidak ada data yang cocok.
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+        {% if page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page-1 }}&search={{ search }}&segment={{ segment }}">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="?page={{ p }}&search={{ search }}&segment={{ segment }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        {% if page < total_pages %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page+1 }}&search={{ search }}&segment={{ segment }}">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+    <p class="text-center text-muted small">Halaman {{ page }} dari {{ total_pages }}</p>
+</nav>
+{% endif %}
+{% endblock %}

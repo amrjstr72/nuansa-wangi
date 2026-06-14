@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-chart-pie"></i> Halo, {{ session.name }}</h1>
+        <p class="text-muted mb-0">Selamat datang — berikut kondisi pelanggan Nuansa Wangi Cilendek saat ini</p>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#4361ee,#3f37c9)">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ total }}</h3>
+            <p>Total Pelanggan</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#8b5cf6,#7c3aed)">
+            <i class="fas fa-receipt"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ total_transaksi }}</h3>
+            <p>Total Transaksi</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#0ea5e9,#0284c7)">
+            <i class="fas fa-wallet"></i>
+        </div>
+        <div class="stat-info">
+            <h5><b>Rp {{ "{:,.0f}".format(total_revenue) }}</b></h5>
+            <p>Total Revenue</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#14b8a6,#0f766e)">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ "%.0f"|format(rfm_stats.avg_r) }} hari</h3>
+            <p>Rata-rata Recency</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#22c55e,#15803d)">
+            <i class="fas fa-redo"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ "%.1f"|format(rfm_stats.avg_f) }}x</h3>
+            <p>Rata-rata Frequency</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#f97316,#c2410c)">
+            <i class="fas fa-coins"></i>
+        </div>
+        <div class="stat-info">
+            <h3>Rp {{ "{:,.0f}".format(rfm_stats.avg_m) }}</h3>
+            <p>Rata-rata Monetary</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#f59e0b,#d97706)">
+            <i class="fas fa-crown"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ champion }}</h3>
+            <p>Pelanggan Terbaik</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#10b981,#059669)">
+            <i class="fas fa-heart"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ loyal }}</h3>
+            <p>Pelanggan Setia</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#3b82f6,#2563eb)">
+            <i class="fas fa-seedling"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ potential }}</h3>
+            <p>Pelanggan Potensial</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg,#ef4444,#dc2626)">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ at_risk }}</h3>
+            <p>Perlu Perhatian</p>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mt-4 g-4">
+    <div class="col-md-5">
+        <div class="chart-card">
+            <h6><i class="fas fa-chart-pie me-2"></i>Proporsi Kelompok Pelanggan</h6>
+            <div style="max-height:300px; display:flex; justify-content:center">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="chart-card">
+            <h6><i class="fas fa-chart-bar me-2"></i>Skor RFM per Kelompok</h6>
+            <canvas id="barChart" style="max-height:280px"></canvas>
+            <small class="text-muted d-block mt-2">
+                Skor 0-100. Recency dibalik: makin baru transaksi, makin tinggi skornya.
+            </small>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 g-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="fas fa-clock me-2 text-info"></i>5 Pelanggan Terakhir Beli Paling Baru</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>#</th><th>Nama Pelanggan</th><th>Terakhir Beli</th><th>Kelompok</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for c, r, s in top_recent %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                            <td>{{ r.display_recency }} hari lalu</td>
+                            <td><span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">{{ s.segment_label }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="fas fa-redo me-2 text-success"></i>5 Pelanggan Paling Sering Beli</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>#</th><th>Nama Pelanggan</th><th>Jumlah Transaksi</th><th>Kelompok</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for c, r, s in top_frequency %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                            <td>{{ r.frequency }}x</td>
+                            <td><span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">{{ s.segment_label }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Monetary Table -->
+<div class="card mt-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="fas fa-trophy me-2 text-warning"></i>5 Pelanggan dengan Belanja Tertinggi</h6>
+        <a href="{{ url_for('customers') }}" class="btn btn-sm btn-outline-primary">Lihat Semua</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Nama Pelanggan</th>
+                        <th>Terakhir Beli</th>
+                        <th>Jumlah Transaksi</th>
+                        <th>Total Belanja</th>
+                        <th>Kelompok</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c, r, s in top_monetary %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                        <td>{{ r.display_recency }} hari lalu</td>
+                        <td>{{ r.frequency }}x</td>
+                        <td>Rp {{ "{:,.0f}".format(r.monetary) }}</td>
+                        <td>
+                            <span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">
+                                <i class="fas {{ segment_config[s.segment_label]['icon'] }} me-1"></i>
+                                {{ s.segment_label }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+const pieCtx = document.getElementById('pieChart').getContext('2d');
+new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ pie_labels|safe }},
+        datasets: [{
+            data: {{ pie_data|safe }},
+            backgroundColor: {{ pie_colors|safe }},
+            borderWidth: 3,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        cutout: '60%',
+        plugins: {
+            legend: { position: 'bottom', labels: { padding: 15, font: { size: 12 } } }
+        }
+    }
+});
+
+const rfmLabels = {{ rfm_labels|safe }};
+const rawRecency = {{ rfm_recency|safe }};
+const rawFrequency = {{ rfm_frequency|safe }};
+const rawMonetary = {{ rfm_monetary|safe }};
+
+function normalize(values, invert = false) {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (max === min) return values.map(() => 100);
+    return values.map(value => {
+        const score = ((value - min) / (max - min)) * 100;
+        return Math.round(invert ? 100 - score : score);
+    });
+}
+
+const barCtx = document.getElementById('barChart').getContext('2d');
+new Chart(barCtx, {
+    type: 'bar',
+    data: {
+        labels: rfmLabels,
+        datasets: [{
+            label: 'Recency Score',
+            data: normalize(rawRecency, true),
+            backgroundColor: '#14b8a6',
+            borderRadius: 8,
+            borderSkipped: false
+        }, {
+            label: 'Frequency Score',
+            data: normalize(rawFrequency),
+            backgroundColor: '#22c55e',
+            borderRadius: 8,
+            borderSkipped: false
+        }, {
+            label: 'Monetary Score',
+            data: normalize(rawMonetary),
+            backgroundColor: '#f97316',
+            borderRadius: 8,
+            borderSkipped: false
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: true, position: 'bottom' },
+            tooltip: {
+                callbacks: {
+                    afterLabel(context) {
+                        const i = context.dataIndex;
+                        if (context.datasetIndex === 0) return `Asli: ${rawRecency[i].toLocaleString('id-ID')} hari`;
+                        if (context.datasetIndex === 1) return `Asli: ${rawFrequency[i].toLocaleString('id-ID')}x`;
+                        return `Asli: Rp ${rawMonetary[i].toLocaleString('id-ID')} ribu`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100,
+                grid: { color: '#f0f0f0' },
+                ticks: { callback: value => value + '%' }
+            },
+            x: { grid: { display: false } }
+        }
+    }
+});
+</script>
+{% endblock %}

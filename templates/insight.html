@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-lightbulb"></i> Ringkasan &amp; Insight</h1>
+        <p class="text-muted mb-0">
+            Temuan otomatis dari data — bisa langsung dijadikan bahan keputusan bisnis
+        </p>
+    </div>
+</div>
+
+<!-- Notifikasi Otomatis -->
+{% if at_risk_pct > 30 %}
+<div class="alert alert-danger d-flex align-items-center mb-3">
+    <i class="fas fa-exclamation-triangle fa-2x me-3 flex-shrink-0"></i>
+    <div>
+        <strong>⚠️ Perlu Tindakan Segera!</strong>
+        Sebanyak {{ at_risk_pct }}% pelanggan ({{ seg_counts.get('At Risk Customer', 0) }} orang)
+        sudah lama tidak berbelanja. Hubungi mereka sekarang sebelum benar-benar pergi.
+    </div>
+</div>
+{% endif %}
+{% if champion_pct > 0 %}
+<div class="alert alert-warning d-flex align-items-center mb-3">
+    <i class="fas fa-crown fa-2x me-3 flex-shrink-0"></i>
+    <div>
+        <strong>👑 Pelanggan Terbaik Kamu</strong> —
+        {{ seg_counts.get('Champion Customer', 0) }} orang ({{ champion_pct }}%)
+        adalah pelanggan paling loyal dan paling banyak belanja.
+        Berikan perhatian ekstra agar mereka tidak berpindah.
+    </div>
+</div>
+{% endif %}
+{% if loyal_pct > 0 %}
+<div class="alert alert-success d-flex align-items-center mb-4">
+    <i class="fas fa-heart fa-2x me-3 flex-shrink-0"></i>
+    <div>
+        <strong>💚 Pelanggan Setia</strong> —
+        {{ seg_counts.get('Loyal Customer', 0) }} orang ({{ loyal_pct }}%)
+        rutin berbelanja. Pertahankan dengan program loyalitas atau diskon khusus.
+    </div>
+</div>
+{% endif %}
+
+<!-- Persentase per Kelompok -->
+<h5 class="mb-3 fw-semibold">Proporsi Kelompok Pelanggan</h5>
+<div class="row g-3 mb-4">
+    {% set pct_map = {
+        'Champion Customer':  champion_pct,
+        'Loyal Customer':     loyal_pct,
+        'Potential Customer': potential_pct,
+        'At Risk Customer':   at_risk_pct
+    } %}
+    {% for label, cfg in segment_config.items() %}
+    <div class="col-md-3">
+        <div class="insight-pct-card" style="border-top:4px solid {{ cfg.color }}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h2 style="color:{{ cfg.color }}">{{ pct_map[label] }}%</h2>
+                    <p class="mb-1 fw-semibold">{{ label }}</p>
+                    <small class="text-muted">{{ seg_counts.get(label, 0) }} dari {{ total }} pelanggan</small>
+                </div>
+                <i class="fas {{ cfg.icon }} fa-2x" style="color:{{ cfg.color }}; opacity:0.25"></i>
+            </div>
+            <div class="progress mt-2" style="height:6px">
+                <div class="progress-bar"
+                     style="width:{{ pct_map[label] }}%; background:{{ cfg.color }}">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Top Customer -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-coins text-warning me-2"></i>
+                    5 Pelanggan Paling Banyak Belanja
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Nama</th>
+                            <th>Total Belanja</th>
+                            <th>Kelompok</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c, r, s in top_monetary %}
+                        <tr>
+                            <td>
+                                {% if loop.index == 1 %}🥇
+                                {% elif loop.index == 2 %}🥈
+                                {% elif loop.index == 3 %}🥉
+                                {% else %}{{ loop.index }}{% endif %}
+                            </td>
+                            <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                            <td>Rp {{ "{:,.0f}".format(r.monetary) }}</td>
+                            <td>
+                                <span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">
+                                    {{ s.segment_label.replace(' Customer','') }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-redo text-primary me-2"></i>
+                    5 Pelanggan Paling Sering Beli
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Nama</th>
+                            <th>Jumlah Transaksi</th>
+                            <th>Kelompok</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c, r, s in top_frequency %}
+                        <tr>
+                            <td>
+                                {% if loop.index == 1 %}🥇
+                                {% elif loop.index == 2 %}🥈
+                                {% elif loop.index == 3 %}🥉
+                                {% else %}{{ loop.index }}{% endif %}
+                            </td>
+                            <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                            <td>{{ r.frequency }}x pembelian</td>
+                            <td>
+                                <span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">
+                                    {{ s.segment_label.replace(' Customer','') }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rata-rata RFM per Kelompok -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h6 class="mb-0">
+            <i class="fas fa-chart-bar text-info me-2"></i>
+            Perbandingan Kebiasaan Belanja per Kelompok
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <table class="table mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Kelompok</th>
+                    <th>
+                        Rata-rata Terakhir Beli
+                        <small class="text-muted d-block fw-normal">semakin kecil = semakin baik</small>
+                    </th>
+                    <th>
+                        Rata-rata Jumlah Beli
+                        <small class="text-muted d-block fw-normal">semakin banyak = semakin baik</small>
+                    </th>
+                    <th>
+                        Rata-rata Total Belanja
+                        <small class="text-muted d-block fw-normal">semakin besar = semakin baik</small>
+                    </th>
+                    <th>Jumlah Pelanggan</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rfm_by_seg %}
+                <tr>
+                    <td>
+                        {% if row.segment_label in segment_config %}
+                        <span class="badge bg-{{ segment_config[row.segment_label]['badge'] }}">
+                            <i class="fas {{ segment_config[row.segment_label]['icon'] }} me-1"></i>
+                            {{ row.segment_label }}
+                        </span>
+                        {% else %}
+                        {{ row.segment_label }}
+                        {% endif %}
+                    </td>
+                    <td>{{ row.avg_r }} hari lalu</td>
+                    <td>{{ row.avg_f }}x</td>
+                    <td>Rp {{ "{:,.0f}".format(row.avg_m) }}</td>
+                    <td>{{ seg_counts.get(row.segment_label, 0) }} orang</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Lokasi & Kategori -->
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-map-marker-alt text-danger me-2"></i>
+                    5 Lokasi Pelanggan Terbanyak
+                </h6>
+            </div>
+            <div class="card-body">
+                {% for lokasi, cnt in top_lokasi %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <small class="text-truncate me-2" style="max-width:70%" title="{{ lokasi }}">
+                        <i class="fas fa-map-pin text-muted me-1"></i>{{ lokasi }}
+                    </small>
+                    <span class="badge bg-primary rounded-pill">{{ cnt }} pelanggan</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-tag text-success me-2"></i>
+                    Distribusi Kategori Produk
+                </h6>
+            </div>
+            <div class="card-body">
+                {% for kat, cnt in top_kategori %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span><i class="fas fa-box text-muted me-1"></i>{{ kat }}</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="width:100px; height:8px">
+                            <div class="progress-bar bg-success"
+                                 style="width:{{ (cnt / total * 100)|round(0) }}%">
+                            </div>
+                        </div>
+                        <span class="badge bg-success rounded-pill">{{ cnt }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

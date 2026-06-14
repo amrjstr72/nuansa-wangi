@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-upload"></i> Perbarui Data Pelanggan</h1>
+        <p class="text-muted mb-0">
+            Upload file baru untuk menambah atau memperbarui data pelanggan di sistem
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('download_upload_template') }}" class="btn btn-success">
+            <i class="fas fa-file-excel me-1"></i> Unduh Template
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-7">
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-content">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h4>Seret &amp; Lepas File ke Sini</h4>
+                <p>atau klik tombol di bawah untuk memilih file</p>
+                <small class="text-muted">Format yang didukung: .xlsx atau .csv (maksimal 10MB)</small>
+                <input type="file" id="fileInput" accept=".xlsx,.csv" style="display:none">
+                <div class="d-flex gap-2 justify-content-center flex-wrap mt-3">
+                    <button class="btn btn-primary" onclick="$('#fileInput').click()">
+                        <i class="fas fa-folder-open me-1"></i> Pilih File
+                    </button>
+                    <a href="{{ url_for('download_upload_template') }}" class="btn btn-outline-success">
+                        <i class="fas fa-download me-1"></i> Template Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div id="uploadResult" class="mt-3" style="display:none">
+            <div class="alert" id="resultAlert">
+                <span id="resultMessage"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="fas fa-info-circle me-2 text-primary"></i>Kolom yang Diperlukan</h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info small">
+                    <strong>Dua mode upload:</strong><br>
+                    <b>Template final</b> memakai kolom <code>Nama Pelanggan</code>,
+                    <code>Recency</code>, <code>Frequency</code>, <code>Monetary</code>, dan
+                    <code>Segment</code>.<br>
+                    <b>Transaksi mentah</b> memakai kolom <code>Nama Pelanggan</code>,
+                    <code>Tanggal</code>, dan <code>Total Transaksi</code>. Sistem akan
+                    membersihkan data, menghitung RFM, lalu menjalankan K-Means otomatis.
+                </div>
+                <p class="small text-muted mb-2">
+                    File kamu harus punya kolom-kolom berikut (nama kolom harus sama persis):
+                </p>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Nama Kolom</th><th>Wajib?</th><th>Keterangan</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Nama Pelanggan</code></td>
+                            <td><span class="text-success">✓ Ya</span></td>
+                            <td>Nama lengkap pelanggan</td>
+                        </tr>
+                        <tr>
+                            <td><code>Recency</code></td>
+                            <td><span class="text-success">✓ Ya</span></td>
+                            <td>Berapa hari lalu terakhir beli</td>
+                        </tr>
+                        <tr>
+                            <td><code>Frequency</code></td>
+                            <td><span class="text-success">✓ Ya</span></td>
+                            <td>Berapa kali total transaksi</td>
+                        </tr>
+                        <tr>
+                            <td><code>Monetary</code></td>
+                            <td><span class="text-success">✓ Ya</span></td>
+                            <td>Total uang yang dibelanjakan (Rp)</td>
+                        </tr>
+                        <tr>
+                            <td><code>Last_Transaction_Date</code></td>
+                            <td><span class="text-success">✓ Ya</span></td>
+                            <td>Tanggal transaksi terakhir (mis. 2026-04-03)</td>
+                        </tr>
+                        <tr>
+                            <td><code>Cluster</code></td>
+                            <td><span class="text-success">✓ Ya</span></td>
+                            <td>Nomor kelompok (0, 1, 2, atau 3)</td>
+                        </tr>
+                        <tr>
+                            <td><code>Segment</code></td>
+                            <td><span class="text-success">✓ Ya</span></td>
+                            <td>Nama kelompok (lihat di bawah)</td>
+                        </tr>
+                        <tr>
+                            <td><code>Nomor HP</code></td>
+                            <td><span class="text-muted">— Tidak</span></td>
+                            <td>Opsional</td>
+                        </tr>
+                        <tr>
+                            <td><code>Lokasi</code></td>
+                            <td><span class="text-muted">— Tidak</span></td>
+                            <td>Opsional</td>
+                        </tr>
+                        <tr>
+                            <td><code>Kategori</code></td>
+                            <td><span class="text-muted">— Tidak</span></td>
+                            <td>Opsional</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="fas fa-tag me-2 text-success"></i>Nilai Kolom Segment yang Valid</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-2">
+                    <li class="mb-1">
+                        <span class="badge bg-warning text-dark me-2">Champion Customer</span>
+                        Pelanggan terbaik
+                    </li>
+                    <li class="mb-1">
+                        <span class="badge bg-success me-2">Loyal Customer</span>
+                        Pelanggan setia
+                    </li>
+                    <li class="mb-1">
+                        <span class="badge bg-primary me-2">Potential Customer</span>
+                        Pelanggan potensial
+                    </li>
+                    <li class="mb-1">
+                        <span class="badge bg-danger me-2">At Risk Customer</span>
+                        Perlu perhatian
+                    </li>
+                </ul>
+                <div class="alert alert-warning small mb-0">
+                    <i class="fas fa-sync-alt me-1"></i>
+                    <strong>Catatan:</strong> Jika nama pelanggan sudah ada,
+                    data RFM dan kelompoknya akan <strong>diperbarui</strong>.
+                    Jika belum ada, pelanggan baru akan ditambahkan.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const uploadArea = document.getElementById('uploadArea');
+const fileInput  = document.getElementById('fileInput');
+
+uploadArea.addEventListener('dragover', e => {
+    e.preventDefault();
+    uploadArea.classList.add('drag-over');
+});
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) handleUpload(e.target.files[0]);
+});
+
+function handleUpload(file) {
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!['.xlsx', '.csv'].includes(ext)) {
+        showResult(false, 'Format file tidak didukung. Gunakan .xlsx atau .csv');
+        return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        showResult(false, 'Ukuran file terlalu besar. Maksimal 10MB.');
+        return;
+    }
+
+    showLoading();
+    const fd = new FormData();
+    fd.append('file', file);
+
+    $.ajax({
+        url: '/upload', method: 'POST', data: fd,
+        processData: false, contentType: false,
+        success(res) {
+            if (res.success) {
+                showResult(true, '✅ ' + res.message + ' Halaman akan diperbarui...');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showResult(false, '❌ ' + res.message);
+            }
+        },
+        error() {
+            showResult(false, '❌ Terjadi kesalahan. Coba lagi beberapa saat.');
+        }
+    });
+}
+
+function showResult(ok, msg) {
+    const div   = document.getElementById('uploadResult');
+    const alert = document.getElementById('resultAlert');
+    const span  = document.getElementById('resultMessage');
+    div.style.display = 'block';
+    alert.className = ok ? 'alert alert-success' : 'alert alert-danger';
+    span.innerHTML = msg;
+    if (!ok) setTimeout(() => div.style.display = 'none', 6000);
+}
+
+function showLoading() {
+    document.getElementById('uploadResult').style.display = 'block';
+    document.getElementById('resultAlert').className = 'alert alert-info';
+    document.getElementById('resultMessage').innerHTML =
+        '<i class="fas fa-spinner fa-spin me-2"></i>Sedang memproses file, harap tunggu...';
+}
+</script>
+{% endblock %}

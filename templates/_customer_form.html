@@ -1,0 +1,62 @@
+<div class="row g-3">
+    <div class="col-md-6">
+        <label class="form-label">Nama Pelanggan</label>
+        <input class="form-control" name="nama_pelanggan" required
+               value="{{ customer.nama_pelanggan if customer else '' }}">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Nomor HP / WhatsApp</label>
+        <input class="form-control" name="nomor_hp"
+               value="{{ customer.nomor_hp if customer and customer.nomor_hp else '' }}">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Lokasi</label>
+        <input class="form-control" name="lokasi"
+               value="{{ customer.lokasi if customer and customer.lokasi else '' }}">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Kategori</label>
+        <input class="form-control" name="kategori"
+               value="{{ customer.kategori if customer and customer.kategori else '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Tanggal Terakhir Beli</label>
+        <input class="form-control" type="date" name="last_transaction_date"
+               value="{{ rfm.last_transaction_date.isoformat() if rfm and rfm.last_transaction_date else '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Recency</label>
+        <input class="form-control" type="number" min="0" name="recency"
+               value="{{ rfm.display_recency if rfm and rfm.display_recency is defined else rfm.recency if rfm else 0 }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Frequency</label>
+        <input class="form-control" type="number" min="0" name="frequency" required
+               value="{{ rfm.frequency if rfm else 0 }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Monetary</label>
+        <input class="form-control" type="number" min="0" step="0.01" name="monetary" required
+               value="{{ rfm.monetary if rfm else 0 }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Total Transaksi</label>
+        <input class="form-control" type="number" min="0" name="total_transaksi"
+               value="{{ customer.total_transaksi if customer else 0 }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Cluster</label>
+        <input class="form-control" type="number" min="0" name="cluster"
+               value="{{ seg.cluster if seg else 0 }}">
+    </div>
+    <div class="col-md-12">
+        <label class="form-label">Segment</label>
+        <select class="form-select" name="segment_label" required>
+            {% for label in segment_config.keys() %}
+            <option value="{{ label }}" {% if seg and seg.segment_label == label %}selected{% endif %}>
+                {{ label }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>

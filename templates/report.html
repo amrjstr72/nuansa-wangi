@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-file-alt"></i> Unduh Laporan</h1>
+        <p class="text-muted mb-0">
+            Ekspor data pelanggan dan hasil analisis ke file Excel atau PDF
+        </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('export_excel') }}" class="btn btn-success">
+            <i class="fas fa-file-excel me-1"></i> Unduh Excel
+        </a>
+        <a href="{{ url_for('export_pdf') }}" class="btn btn-danger">
+            <i class="fas fa-file-pdf me-1"></i> Unduh PDF
+        </a>
+        <button class="btn btn-secondary" onclick="window.print()">
+            <i class="fas fa-print me-1"></i> Cetak Halaman
+        </button>
+    </div>
+</div>
+
+<!-- KPI -->
+<div class="stats-grid mb-4">
+    <div class="stat-card">
+        <div class="stat-icon" style="background:linear-gradient(135deg,#4361ee,#3f37c9)">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ total }}</h3>
+            <p>Total Pelanggan</p>
+        </div>
+    </div>
+    {% for label, cfg in segment_config.items() %}
+    <div class="stat-card">
+        <div class="stat-icon" style="background:{{ cfg.color }}">
+            <i class="fas {{ cfg.icon }}"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ seg_counts.get(label, 0) }}</h3>
+            <p>{{ label }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Chart + Statistik -->
+<div class="row g-4 mb-4">
+    <div class="col-md-5">
+        <div class="chart-card">
+            <h6><i class="fas fa-chart-pie me-2"></i>Proporsi Kelompok Pelanggan</h6>
+            <div style="max-height:280px; display:flex; justify-content:center">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="fas fa-calculator me-2"></i>Ringkasan Angka Penting</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 text-center">
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h4 class="text-primary">Rp {{ "{:,.0f}".format(rfm_stats.total_m) }}</h4>
+                            <small class="text-muted">Total Seluruh Belanja</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h4 class="text-success">Rp {{ "{:,.0f}".format(rfm_stats.avg_m) }}</h4>
+                            <small class="text-muted">Rata-rata Belanja per Pelanggan</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h4 class="text-warning">{{ "%.1f"|format(rfm_stats.avg_f) }}x</h4>
+                            <small class="text-muted">Rata-rata Jumlah Transaksi</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h4 class="text-danger">{{ "%.0f"|format(rfm_stats.avg_r) }} hari</h4>
+                            <small class="text-muted">Rata-rata Terakhir Beli</small>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="text-muted small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Metode pengelompokan: K-Means (4 kelompok) ·
+                    Kualitas hasil: Silhouette Score <strong>0.59</strong> (Baik)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top 5 -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h6 class="mb-0">
+            <i class="fas fa-trophy text-warning me-2"></i>
+            5 Pelanggan dengan Total Belanja Tertinggi
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>No.</th>
+                    <th>Nama Pelanggan</th>
+                    <th>Lokasi</th>
+                    <th>Terakhir Beli</th>
+                    <th>Jumlah Transaksi</th>
+                    <th>Total Belanja</th>
+                    <th>Kelompok</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c, r, s in top5 %}
+                <tr>
+                    <td>
+                        {% if loop.index == 1 %}🥇
+                        {% elif loop.index == 2 %}🥈
+                        {% elif loop.index == 3 %}🥉
+                        {% else %}{{ loop.index }}{% endif %}
+                    </td>
+                    <td><strong>{{ c.nama_pelanggan }}</strong></td>
+                    <td>{{ c.lokasi or '-' }}</td>
+                    <td>{{ r.display_recency }} hari lalu</td>
+                    <td>{{ r.frequency }}x</td>
+                    <td>Rp {{ "{:,.0f}".format(r.monetary) }}</td>
+                    <td>
+                        <span class="badge bg-{{ segment_config[s.segment_label]['badge'] }}">
+                            {{ s.segment_label }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const pieCtx = document.getElementById('pieChart').getContext('2d');
+new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ pie_labels|safe }},
+        datasets: [{
+            data: {{ pie_data|safe }},
+            backgroundColor: {{ pie_colors|safe }},
+            borderWidth: 3, borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true, cutout: '55%',
+        plugins: { legend: { position: 'bottom' } }
+    }
+});
+</script>
+{% endblock %}
