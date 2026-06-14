@@ -1,0 +1,12 @@
+.env
+*.db
+*.sqlite3
+instance/
+__pycache__/
+*.pyc
+.git/
+.venv/
+venv/
+env/
+customer-intelligence/data/
+data/
