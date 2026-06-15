@@ -1,7 +1,7 @@
 from flask import (Flask, render_template, request, jsonify,
                    session, redirect, url_for, send_file)
 from database import db, Customer, RFMResult, CustomerSegment, User
-from sqlalchemy import func
+from sqlalchemy import func, text
 from dotenv import load_dotenv
 from datetime import date
 from functools import wraps
@@ -272,7 +272,13 @@ def _is_final_upload(df):
     return name_exists and FINAL_UPLOAD_REQUIRED.issubset(set(df.columns))
 
 
-def _save_customer_upload(df):
+def _latest_date(current_date, new_date):
+    if current_date and new_date:
+        return max(current_date, new_date)
+    return new_date or current_date
+
+
+def _save_customer_upload(df, merge_existing=False):
     nama_col = 'Nama Customer' if 'Nama Customer' in df.columns else 'Nama Pelanggan'
     count = 0
 
@@ -301,6 +307,15 @@ def _save_customer_upload(df):
 
         existing = Customer.query.filter_by(nama_pelanggan=nama).first()
         if existing:
+            existing_frequency = existing.rfm.frequency if existing.rfm else existing.total_transaksi or 0
+            existing_monetary = existing.rfm.monetary if existing.rfm else 0
+            existing_last_date = existing.rfm.last_transaction_date if existing.rfm else None
+            if merge_existing:
+                frequency = existing_frequency + frequency
+                monetary = existing_monetary + monetary
+                last_date = _latest_date(existing_last_date, last_date)
+                recency_value = calculate_recency(last_date, recency_value)
+
             existing.nomor_hp = nomor_hp or existing.nomor_hp
             existing.lokasi = _clean_optional_value(row.get('Lokasi')) or existing.lokasi
             existing.kategori = _clean_optional_value(row.get('Kategori')) or existing.kategori
@@ -380,6 +395,28 @@ def ensure_default_users():
     )
     admin.set_password(ADMIN_PASSWORD)
     db.session.add(admin)
+    db.session.commit()
+
+
+def ensure_postgres_sequences():
+    if not app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgresql'):
+        return
+
+    for model in (User, Customer, RFMResult, CustomerSegment):
+        table_name = model.__tablename__
+        pk_name = next(iter(model.__table__.primary_key.columns)).name
+        db.session.execute(
+            text(
+                f"""
+                SELECT setval(
+                    pg_get_serial_sequence(:table_name, :pk_name),
+                    COALESCE((SELECT MAX({pk_name}) FROM {table_name}), 0) + 1,
+                    false
+                )
+                """
+            ),
+            {'table_name': table_name, 'pk_name': pk_name},
+        )
     db.session.commit()
 
 
@@ -1305,11 +1342,13 @@ def upload():
             if _is_final_upload(df):
                 import_df = df
                 mode = 'template final'
+                merge_existing = False
             else:
                 import_df = _build_rfm_from_transactions(df)
-                mode = 'transaksi mentah, sudah dibersihkan dan dianalisis RFM + clustering'
+                mode = 'transaksi mentah, sudah ditambahkan ke data yang ada'
+                merge_existing = True
 
-            count = _save_customer_upload(import_df)
+            count = _save_customer_upload(import_df, merge_existing=merge_existing)
 
             db.session.commit()
             return jsonify({'success': True,
@@ -1328,12 +1367,14 @@ def upload():
 with app.app_context():
     db.create_all()
     ensure_default_users()
+    ensure_postgres_sequences()
 
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         ensure_default_users()
+        ensure_postgres_sequences()
         # Seed dari Excel saat pertama kali
         from seed import seed_database
         seed_database()
