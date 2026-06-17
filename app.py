@@ -522,6 +522,16 @@ def ensure_postgres_sequences():
     db.session.commit()
 
 
+def ensure_postgres_schema_updates():
+    if not app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgresql'):
+        return
+
+    db.session.execute(text(
+        "ALTER TABLE customers ALTER COLUMN lokasi TYPE TEXT"
+    ))
+    db.session.commit()
+
+
 def calculate_recency(last_transaction_date, fallback=None):
     if last_transaction_date:
         return max((date.today() - last_transaction_date).days, 0)
@@ -1475,6 +1485,7 @@ def upload():
 with app.app_context():
     db.create_all()
     ensure_default_users()
+    ensure_postgres_schema_updates()
     ensure_postgres_sequences()
 
 
@@ -1482,6 +1493,7 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         ensure_default_users()
+        ensure_postgres_schema_updates()
         ensure_postgres_sequences()
         # Seed dari Excel saat pertama kali
         from seed import seed_database

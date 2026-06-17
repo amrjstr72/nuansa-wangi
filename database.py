@@ -29,7 +29,7 @@ class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nama_pelanggan = db.Column(db.String(150), nullable=False)
     nomor_hp = db.Column(db.String(30), nullable=True)
-    lokasi = db.Column(db.String(200), nullable=True)
+    lokasi = db.Column(db.Text, nullable=True)
     kategori = db.Column(db.String(50), nullable=True)
     total_transaksi = db.Column(db.Integer, default=0)   # jumlah baris transaksi dari dataset
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
