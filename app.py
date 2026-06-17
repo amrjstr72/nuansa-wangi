@@ -8,6 +8,7 @@ from functools import wraps
 import pandas as pd
 import io
 import json
+import math
 import os
 import re
 from urllib.parse import quote
@@ -233,6 +234,36 @@ def _label_clusters(rfm):
     return cluster_labels
 
 
+def _rfm_score_segments(rfm):
+    scored = rfm.copy()
+    scored['R_Score'] = (
+        scored['Recency'].rank(method='average', ascending=False, pct=True)
+        .mul(4).apply(lambda value: max(1, min(4, math.ceil(value))))
+    )
+    scored['F_Score'] = (
+        scored['Frequency'].rank(method='average', pct=True)
+        .mul(4).apply(lambda value: max(1, min(4, math.ceil(value))))
+    )
+    scored['M_Score'] = (
+        scored['Monetary'].rank(method='average', pct=True)
+        .mul(4).apply(lambda value: max(1, min(4, math.ceil(value))))
+    )
+    scored['RFM_Score'] = scored['R_Score'] + scored['F_Score'] + scored['M_Score']
+
+    def label(row):
+        if row['F_Score'] >= 4 and row['M_Score'] >= 4:
+            return 'Champion Customer'
+        if row['RFM_Score'] >= 10 and row['F_Score'] >= 3 and row['M_Score'] >= 3:
+            return 'Champion Customer'
+        if row['R_Score'] <= 1 and row['RFM_Score'] <= 7:
+            return 'At Risk Customer'
+        if row['RFM_Score'] >= 8 and (row['F_Score'] >= 3 or row['M_Score'] >= 3):
+            return 'Loyal Customer'
+        return 'Potential Customer'
+
+    return scored.apply(label, axis=1)
+
+
 def _build_rfm_from_transactions(df):
     clean_df = _normalize_raw_transactions(df)
     snapshot_date = pd.Timestamp.today().normalize()
@@ -259,12 +290,58 @@ def _build_rfm_from_transactions(df):
             random_state=42,
             n_init=10
         ).fit_predict(scaled)
-        rfm['Segment'] = rfm['Cluster'].map(_label_clusters(rfm))
     else:
         rfm['Cluster'] = 0
-        rfm['Segment'] = 'Potential Customer'
+
+    rfm['Segment'] = _rfm_score_segments(rfm)
 
     return rfm.rename(columns={'Nomor_HP': 'Nomor HP'})
+
+
+def _recalculate_all_customer_segments():
+    rows = (
+        db.session.query(Customer, RFMResult)
+        .join(RFMResult, Customer.id == RFMResult.customer_id)
+        .all()
+    )
+    if not rows:
+        return
+
+    rfm = pd.DataFrame([{
+        'customer_id': customer.id,
+        'Recency': calculate_recency(result.last_transaction_date, result.recency),
+        'Frequency': result.frequency,
+        'Monetary': result.monetary,
+    } for customer, result in rows])
+
+    cluster_count = min(4, len(rfm))
+    if cluster_count > 1:
+        from sklearn.cluster import KMeans
+        from sklearn.preprocessing import StandardScaler
+
+        features = rfm[['Recency', 'Frequency', 'Monetary']]
+        scaled = StandardScaler().fit_transform(features)
+        rfm['Cluster'] = KMeans(
+            n_clusters=cluster_count,
+            random_state=42,
+            n_init=10
+        ).fit_predict(scaled)
+    else:
+        rfm['Cluster'] = 0
+
+    rfm['Segment'] = _rfm_score_segments(rfm)
+
+    for item in rfm.itertuples(index=False):
+        segment = CustomerSegment.query.filter_by(customer_id=item.customer_id).first()
+        if segment:
+            segment.cluster = int(item.Cluster)
+            segment.segment_label = item.Segment
+        else:
+            db.session.add(CustomerSegment(
+                customer_id=int(item.customer_id),
+                cluster=int(item.Cluster),
+                segment_label=item.Segment,
+            ))
 
 
 def _is_final_upload(df):
@@ -276,6 +353,24 @@ def _latest_date(current_date, new_date):
     if current_date and new_date:
         return max(current_date, new_date)
     return new_date or current_date
+
+
+def _safe_int(value, default=0):
+    if value is None or pd.isna(value):
+        return default
+    text = str(value).strip()
+    if not text or text.lower() in {'nan', 'none', '-'}:
+        return default
+    return int(float(text))
+
+
+def _safe_float(value, default=0):
+    if value is None or pd.isna(value):
+        return default
+    text = str(value).strip()
+    if not text or text.lower() in {'nan', 'none', '-'}:
+        return default
+    return float(text)
 
 
 def _save_customer_upload(df, merge_existing=False):
@@ -300,10 +395,10 @@ def _save_customer_upload(df, merge_existing=False):
         except Exception:
             last_date = None
 
-        recency_value = calculate_recency(last_date, int(row['Recency']))
-        frequency = int(row['Frequency'])
-        monetary = float(row['Monetary'])
-        cluster = int(row.get('Cluster', 0) or 0)
+        recency_value = calculate_recency(last_date, _safe_int(row['Recency']))
+        frequency = _safe_int(row['Frequency'])
+        monetary = _safe_float(row['Monetary'])
+        cluster = _safe_int(row.get('Cluster'), 0)
 
         existing = Customer.query.filter_by(nama_pelanggan=nama).first()
         if existing:
@@ -311,10 +406,17 @@ def _save_customer_upload(df, merge_existing=False):
             existing_monetary = existing.rfm.monetary if existing.rfm else 0
             existing_last_date = existing.rfm.last_transaction_date if existing.rfm else None
             if merge_existing:
+                existing_recency = calculate_recency(
+                    existing_last_date,
+                    existing.rfm.recency if existing.rfm else None
+                )
                 frequency = existing_frequency + frequency
                 monetary = existing_monetary + monetary
                 last_date = _latest_date(existing_last_date, last_date)
-                recency_value = calculate_recency(last_date, recency_value)
+                recency_value = (
+                    calculate_recency(last_date, min(existing_recency, recency_value))
+                    if last_date else min(existing_recency, recency_value)
+                )
 
             existing.nomor_hp = nomor_hp or existing.nomor_hp
             existing.lokasi = _clean_optional_value(row.get('Lokasi')) or existing.lokasi
@@ -333,10 +435,10 @@ def _save_customer_upload(df, merge_existing=False):
                     monetary=monetary,
                     last_transaction_date=last_date,
                 ))
-            if existing.segment:
+            if existing.segment and not merge_existing:
                 existing.segment.cluster = cluster
                 existing.segment.segment_label = segment_label
-            else:
+            elif not existing.segment:
                 db.session.add(CustomerSegment(
                     customer_id=existing.id,
                     cluster=cluster,
@@ -1341,14 +1443,20 @@ def upload():
 
             if _is_final_upload(df):
                 import_df = df
-                mode = 'template final'
-                merge_existing = False
+                merge_existing = request.form.get('merge_existing') == '1'
+                mode = (
+                    'template final, sudah ditambahkan ke data yang ada'
+                    if merge_existing else
+                    'template final, mengganti data customer yang sudah ada'
+                )
             else:
                 import_df = _build_rfm_from_transactions(df)
                 mode = 'transaksi mentah, sudah ditambahkan ke data yang ada'
                 merge_existing = True
 
             count = _save_customer_upload(import_df, merge_existing=merge_existing)
+            if merge_existing:
+                _recalculate_all_customer_segments()
 
             db.session.commit()
             return jsonify({'success': True,
