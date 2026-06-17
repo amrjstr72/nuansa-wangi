@@ -33,14 +33,7 @@
             <i class="fas fa-wallet"></i>
         </div>
         <div class="stat-info">
-            <h3>
-                {% set rev_jt = (total_revenue / 1000000) %}
-                {% if rev_jt >= 1000 %}
-                    Rp {{ "%.1f"|format(rev_jt / 1000) }} M
-                {% else %}
-                    Rp {{ "%.1f"|format(rev_jt) }} jt
-                {% endif %}
-            </h3>
+            <h3 class="stat-money">Rp {{ "{:,.0f}".format(total_revenue) }}</h3>
             <p>Total Revenue</p>
         </div>
     </div>
@@ -67,14 +60,7 @@
             <i class="fas fa-coins"></i>
         </div>
         <div class="stat-info">
-            <h3>
-                {% set avg_jt = (rfm_stats.avg_m / 1000000) %}
-                {% if avg_jt >= 1 %}
-                    Rp {{ "%.1f"|format(avg_jt) }} jt
-                {% else %}
-                    Rp {{ "%.0f"|format(rfm_stats.avg_m / 1000) }} rb
-                {% endif %}
-            </h3>
+            <h3 class="stat-money">Rp {{ "{:,.0f}".format(rfm_stats.avg_m) }}</h3>
             <p>Rata-rata Monetary</p>
         </div>
     </div>
